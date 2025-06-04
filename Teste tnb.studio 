@@ -1,0 +1,315 @@
+<?php
+class Funcionario {
+    public $nome;
+    public $nomeSocial;
+    public $email;
+    public $cpf;
+    public $idade;
+    public $departamento;
+    public $jornada;
+
+    public function __construct($nome, $nomeSocial, $email, $cpf, $idade, $departamento) {
+        $this->nome = $nome;
+        $this->nomeSocial = $nomeSocial;
+        $this->email = $email;
+        $this->cpf = $cpf;
+        $this->idade = $idade;
+        $this->departamento = $departamento;
+        $this->jornada = [];
+    }
+
+    public function registrarHorario($data, $entrada, $saida) {
+        if (!isset($this->jornada[$data])) {
+            $this->jornada[$data] = [];
+        }
+        $this->jornada[$data][] = ['entrada' => $entrada, 'saida' => $saida];
+    }
+
+    public function calcularHorasTrabalhadas() {
+        $total = 0;
+
+        foreach ($this->jornada as $registros) {
+            foreach ($registros as $ponto) {
+                $entrada = strtotime($ponto['entrada']);
+                $saida = strtotime($ponto['saida']);
+
+                while ($entrada < $saida) {
+                    $hora = date("H:i", $entrada);
+                    $horaNum = (int)date("H", $entrada);
+                    if ($horaNum >= 8 && $horaNum < 12 || $horaNum >= 13 && $horaNum < 18) {
+                        $total += 60;
+                    }
+                    $entrada = strtotime("+1 hour", $entrada);
+                }
+            }
+        }
+        return floor($total / 60);
+    }
+
+    public function exibirJornada() {
+        $saida = "";
+        foreach ($this->jornada as $data => $horas) {
+            $saida .= "$data: ";
+            foreach ($horas as $par) {
+                $saida .= "Entrada: {$par['entrada']}, Saída: {$par['saida']} | ";
+            }
+            $saida = rtrim($saida, '| ') . "<br>";
+        }
+        $totalHoras = $this->calcularHorasTrabalhadas();
+        return $saida . "<strong>Total de horas úteis trabalhadas:</strong> {$totalHoras}h";
+    }
+}
+
+class Departamento {
+    public $nome;
+    public function __construct($nome) {
+        $this->nome = $nome;
+    }
+}
+
+function gerarHorasUteis() {
+    $horas = [];
+    for ($h = 7; $h <= 18; $h++) {
+        $horas[] = sprintf("%02d:00", $h);
+        $horas[] = sprintf("%02d:30", $h);
+    }
+    return $horas;
+}
+
+session_start();
+
+if (!isset($_SESSION['departamentos'])) $_SESSION['departamentos'] = [];
+if (!isset($_SESSION['funcionarios'])) $_SESSION['funcionarios'] = [];
+
+if (isset($_POST['add_departamento'])) {
+    $_SESSION['departamentos'][] = new Departamento(trim($_POST['nome_departamento']));
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+if (isset($_POST['add_funcionario'])) {
+    $nome = trim($_POST['nome']);
+    $nomeSocial = trim($_POST['nome_social']);
+    $email = trim($_POST['email']);
+    $cpf = trim($_POST['cpf']);
+    $idade = intval($_POST['idade']);
+    $dep = intval($_POST['departamento']);
+
+    if (isset($_SESSION['departamentos'][$dep])) {
+        $departamento = $_SESSION['departamentos'][$dep]->nome;
+        $_SESSION['funcionarios'][] = new Funcionario($nome, $nomeSocial, $email, $cpf, $idade, $departamento);
+    }
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+if (isset($_POST['registrar_hora'])) {
+    $func = intval($_POST['funcionario']);
+    $data = $_POST['data_trabalho'];
+    $entrada = $_POST['hora_entrada'];
+    $saida = $_POST['hora_saida'];
+
+    if (isset($_SESSION['funcionarios'][$func])) {
+        $_SESSION['funcionarios'][$func]->registrarHorario($data, $entrada, $saida);
+    }
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+?>
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestão de Funcionários</title>
+    <style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        background: #f7f9fc;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+    }
+
+    h1 {
+        text-align: center;
+        color: #2c3e50;
+        margin-bottom: 30px;
+        font-weight: 700;
+    }
+
+    form {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        padding: 20px 25px;
+        margin-bottom: 40px;
+        width: 100%;
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    form h2 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #34495e;
+        font-weight: 600;
+        border-bottom: 2px solid #2980b9;
+        padding-bottom: 8px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    select {
+        width: 100%;
+        padding: 8px 12px;
+        margin-bottom: 16px;
+        border: 1.8px solid #bdc3c7;
+        border-radius: 5px;
+        transition: border-color 0.3s ease;
+        font-size: 15px;
+    }
+
+    input:focus,
+    select:focus {
+        border-color: #2980b9;
+        outline: none;
+    }
+
+    button {
+        background: #2980b9;
+        border: none;
+        color: white;
+        padding: 12px 25px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 16px;
+        transition: background-color 0.3s ease;
+        width: 100%;
+    }
+
+    button:hover {
+        background: #1f6391;
+    }
+
+    .funcionario {
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+        overflow-wrap: break-word;
+        word-break: break-word;
+    }
+
+    .funcionario strong {
+        color: #2c3e50;
+    }
+
+    .jornada {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #555;
+        background: #ecf0f1;
+        padding: 10px 15px;
+        border-radius: 5px;
+        white-space: pre-wrap;
+    }
+
+    @media (max-width: 600px) {
+        form, .funcionario {
+            padding: 15px 20px;
+        }
+
+        button {
+            font-size: 14px;
+            padding: 10px;
+        }
+    }
+</style>
+
+</head>
+<body>
+
+<h2 style="text-align:center;">Gestão de Funcionários</h2>
+
+<form method="post">
+    <h3>Adicionar Departamento</h3>
+    <input type="text" name="nome_departamento" placeholder="Nome do departamento" required>
+    <button type="submit" name="add_departamento">Adicionar</button>
+</form>
+
+<form method="post">
+    <h3>Adicionar Funcionário</h3>
+    <input type="text" name="nome" placeholder="Nome completo" required>
+    <input type="text" name="nome_social" placeholder="Nome social / como quer ser chamado">
+    <input type="email" name="email" placeholder="Email" required>
+    <input type="text" name="cpf" placeholder="CPF" required>
+    <input type="number" name="idade" placeholder="Idade" min="18" required>
+    <select name="departamento" required>
+        <option value="">Selecione o departamento</option>
+        <?php foreach ($_SESSION['departamentos'] as $i => $dep): ?>
+            <option value="<?= $i ?>"><?= htmlspecialchars($dep->nome) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <button type="submit" name="add_funcionario">Adicionar</button>
+</form>
+
+<form method="post">
+    <h3>Registrar Horário Trabalhado</h3>
+    <select name="funcionario" required>
+        <option value="">Selecione o funcionário</option>
+        <?php foreach ($_SESSION['funcionarios'] as $i => $func): ?>
+            <option value="<?= $i ?>"><?= htmlspecialchars($func->nome) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <input type="date" name="data_trabalho" required>
+    <label>Entrada:</label>
+    <select name="hora_entrada" required>
+        <?php foreach (gerarHorasUteis() as $hora): ?>
+            <option value="<?= $hora ?>"><?= $hora ?></option>
+        <?php endforeach; ?>
+    </select>
+    <label>Saída:</label>
+    <select name="hora_saida" required>
+        <?php foreach (gerarHorasUteis() as $hora): ?>
+            <option value="<?= $hora ?>"><?= $hora ?></option>
+        <?php endforeach; ?>
+    </select>
+    <button type="submit" name="registrar_hora">Registrar</button>
+</form>
+
+<h3 style="text-align:center;">Funcionários Cadastrados</h3>
+<?php foreach ($_SESSION['funcionarios'] as $func): ?>
+    <div class="funcionario">
+        <p><strong>Nome:</strong> <?= htmlspecialchars($func->nome) ?></p>
+        <p><strong>Nome Social:</strong> <?= htmlspecialchars($func->nomeSocial) ?></p>
+        <p><strong>Email:</strong> <?= htmlspecialchars($func->email) ?></p>
+        <p><strong>CPF:</strong> <?= htmlspecialchars($func->cpf) ?></p>
+        <p><strong>Idade:</strong> <?= htmlspecialchars($func->idade) ?></p>
+        <p><strong>Departamento:</strong> <?= htmlspecialchars($func->departamento) ?></p>
+        <div><?= $func->exibirJornada() ?></div>
+    </div>
+<?php endforeach; ?>
+
+</body>
+</html>
